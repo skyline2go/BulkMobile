@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.security.KeyStore;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -43,12 +44,23 @@ import java.util.TreeMap;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
+import org.apache.http.HttpVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.conn.ClientConnectionManager;
+import org.apache.http.conn.scheme.PlainSocketFactory;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.scheme.SchemeRegistry;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.params.HttpProtocolParams;
+import org.apache.http.protocol.HTTP;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -59,6 +71,7 @@ import org.ksoap2.transport.HttpTransportSE;
 
 import com.example.atest.PictureProperty;
 import com.example.atest.SinglePicArrayData;
+import com.example.atest.CustomSSLSocketFactory;
 
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
@@ -99,7 +112,9 @@ public class MainActivity extends Activity {
 		return getString(R.string.album_name);
 	}*/
 	
-    private String restRouteURL = "http://maps2.dcgis.dc.gov/dcgis/rest/services/DPW/csr_closeout/MapServer/0/query?"; 
+    //private String restRouteURL = "http://maps2.dcgis.dc.gov/dcgis/rest/services/DPW/csr_closeout/MapServer/0/query?"; 
+	//Oct 4th, 2017 Change from http to https
+	private String restRouteURL = "https://maps2.dcgis.dc.gov/dcgis/rest/services/DPW/csr_closeout/MapServer/0/query?"; 
     private String restRouteWherePart1 = "where=Route%3D'";  //+ selRt +  
     private String restRouteWherePart2 = "'&text=&objectIds=&time=&geometry=&geometryType=esriGeometryEnvelope&inSR=&spatialRel=esriSpatialRelIntersects&relationParam=&outFields=Route%2C+Address%2C+Comments%2C+Sequence%2CSERVNO&returnGeometry=true&maxAllowableOffset=&geometryPrecision=&outSR=&returnIdsOnly=false&returnCountOnly=false&orderByFields=&groupByFieldsForStatistics=&outStatistics=&returnZ=false&returnM=false&gdbVersion=&f=pjson";
     Spinner spinner;
@@ -257,6 +272,80 @@ public class MainActivity extends Activity {
 		//stopService(mServiceIntent);
 	}
 
+	public HttpClient getNewHttpClient() {
+	    try {
+	        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+	        trustStore.load(null, null);
+
+	        CustomSSLSocketFactory sf = new CustomSSLSocketFactory(trustStore);
+	        sf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+
+	        HttpParams params = new BasicHttpParams();
+	        HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1);
+	        HttpProtocolParams.setContentCharset(params, HTTP.UTF_8);
+
+	        SchemeRegistry registry = new SchemeRegistry();
+	        registry.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80));
+	        registry.register(new Scheme("https", sf, 443));
+
+	        ClientConnectionManager ccm = new ThreadSafeClientConnManager(params, registry);
+
+	        HttpClient hc= new DefaultHttpClient(ccm, params);
+	        
+	        return hc;
+	    }  catch (ClientProtocolException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return null;
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+            return null;
+            //throw e;
+        } catch (Exception e) {
+	    	
+	    	e.printStackTrace();
+	    	//throw e;
+	        //return new DefaultHttpClient();
+	    	return null;
+	    }
+	}
+	
+	public String getRESTurl(String url) throws Exception {
+		
+		String responseString = null;		
+	    
+		try{
+			
+			HttpClient httpclient = getNewHttpClient();
+			 
+			HttpUriRequest hRequest = new HttpGet(url);
+		    HttpResponse response = httpclient.execute(hRequest);
+		    StatusLine statusLine = response.getStatusLine();
+		    if(statusLine.getStatusCode() == HttpStatus.SC_OK){
+		        ByteArrayOutputStream out = new ByteArrayOutputStream();
+		        response.getEntity().writeTo(out);
+		        responseString = out.toString();
+		        out.close();
+		        
+		        //..more logic
+		    } else{
+		        //Closes the connection.
+		        response.getEntity().getContent().close();
+		        throw new IOException(statusLine.getReasonPhrase());
+		    }
+		}catch (ClientProtocolException e) {
+	        // TODO Auto-generated catch block
+	        //e.printStackTrace();
+	        throw e;
+	    } catch (IOException e) {
+	        // TODO Auto-generated catch block
+	        //e.printStackTrace();
+	        throw e;
+	    }
+		return responseString;
+	}
+	
 	public String queryRESTurl(String url) throws Exception {
 		
 		String responseString = null;		
@@ -674,7 +763,9 @@ public class MainActivity extends Activity {
 			}
 			else {
 				try {
-					result = queryRESTurl(restRouteURL + restRouteWherePart1 + val.toString() + restRouteWherePart2 );
+					//result = queryRESTurl(restRouteURL + restRouteWherePart1 + val.toString() + restRouteWherePart2 );
+					//dliu15 Oct4 Change from http to https
+					result = getRESTurl(restRouteURL + restRouteWherePart1 + val.toString() + restRouteWherePart2 );
 				} catch (Exception e) {
 					//If error happened, return directly
 					result = null;
@@ -1186,7 +1277,11 @@ public class MainActivity extends Activity {
 		 	 {
 		 	    	String result;
 		 	    	try {
-		 	    		result = queryRESTurl(restRouteURL + restRouteWherePart1 + i + restRouteWherePart2 );
+		 	    		
+		 	    		//result = queryRESTurl(restRouteURL + restRouteWherePart1 + i + restRouteWherePart2 );
+		 	    		//Oct 4, 2017 Change the route url from http to https.
+		 	    		result = getRESTurl(restRouteURL + restRouteWherePart1 + i + restRouteWherePart2 );
+		 	    		
 		 	    	} catch (Exception e) {
 		 	    		result = null;
 		 	    		e.printStackTrace();
