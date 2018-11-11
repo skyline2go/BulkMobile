@@ -71,7 +71,7 @@ import org.ksoap2.transport.HttpTransportSE;
 
 import com.example.atest.PictureProperty;
 import com.example.atest.SinglePicArrayData;
-import com.example.atest.CustomSSLSocketFactory;
+import com.example.atest.CustomSSLSocketFactoryTLS12;
 
 import android.telephony.PhoneStateListener;
 import android.telephony.SignalStrength;
@@ -277,7 +277,7 @@ public class MainActivity extends Activity {
 	        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
 	        trustStore.load(null, null);
 
-	        CustomSSLSocketFactory sf = new CustomSSLSocketFactory(trustStore);
+	        CustomSSLSocketFactoryTLS12 sf = new CustomSSLSocketFactoryTLS12(trustStore);
 	        sf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
 
 	        HttpParams params = new BasicHttpParams();
